@@ -10,12 +10,24 @@ listen() ->
     DefaultIP = {0, 0, 0, 0},
     DefaultIPVersion = inet, % inet6
 
+    DefaultActive = false,
+    DefaultBuffer = 65536,
+    DefaultKeepAlive = false,
+    DefaultNoDelay = true,
+
+    DefaultReuseaddr = true,
+
     case gen_tcp:listen(DefaultPort, [DefaultPacketFormat,
                                        {backlog, DefaultBackLog},
                                        {ip, DefaultIP},
-                                       DefaultIPVersion
+                                       DefaultIPVersion,
+                                       {active, DefaultActive},
+                                       {buffer, DefaultBuffer},
+                                       {keepalive, DefaultKeepAlive},
+                                       {nodelay, DefaultNoDelay},
+                                       {reuseaddr, DefaultReuseaddr}
                                      ]) of
-        {ok, _LSocket} -> 
+        {ok, _LSocket} ->
             {ok, DefaultPort};
         {error, Reason} ->
             {error, Reason}
