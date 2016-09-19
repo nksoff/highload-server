@@ -11,7 +11,9 @@
           code = 400 :: http_code(),
           body = <<"">> :: binary(),
           body_from_file = <<"">> :: binary(),
-          content_type = "text/html" :: binary()
+          content_type = "text/html" :: binary(),
+          headers_only = false :: boolean()
          }).
 
 -define(DELIMITERS, [<<" ">>, <<"?">>, <<"\r">>, <<"\n">>, <<"\r\n">>]).
+-define(DEFAULT_INDEX, "index.html").

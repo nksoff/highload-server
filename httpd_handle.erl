@@ -1,4 +1,5 @@
 -module(httpd_handle).
+-include_lib("kernel/include/file.hrl").
 -include("httpd.hrl").
 
 -export([action/1]).
@@ -24,10 +25,25 @@ get_request(RawHttpString) ->
 
 handle_path(Path) ->
     [{_, DocumentRoot} | _] = ets:lookup(highload_settings, "document_root"),
-    filename:join(DocumentRoot, Path).
+    FlattenedPath = filename:flatten([DocumentRoot, Path]),
+    case binary:last(list_to_binary(FlattenedPath)) of
+        $/ ->
+            filename:flatten([FlattenedPath, ?DEFAULT_INDEX]);
+        _ ->
+            FlattenedPath
+    end.
 
 is_path_valid(Path) ->
     not lists:member("..", string:tokens(Path, "/")).
+
+is_file_available(Path) ->
+    case file:read_file_info(Path) of
+        {ok, #file_info{type = regular, access = Access}}
+          when Access =:= read_write orelse Access =:= read ->
+            true;
+        _ ->
+            false
+    end.
 
 get_response(#request{method = Method, path = Path}) ->
     MethodValid = Method =:= <<"GET">> orelse Method =:= <<"HEAD">>,
@@ -40,7 +56,16 @@ get_response(#request{method = Method, path = Path}) ->
         {_, false} ->
             #response{code = 400, body = "Wrong path"};
         _ ->
-            #response{code = 200, body = Path}
+            FileAvailable = is_file_available(HandledPath),
+
+            case {FileAvailable, Method} of
+                {true, <<"GET">>} ->
+                    #response{code = 200, body_from_file = HandledPath};
+                {true, <<"HEAD">>} ->
+                    #response{code = 200, body_from_file = HandledPath, headers_only = false};
+                _ ->
+                    #response{code = 404}
+            end
     end.
 
 response_to_text(#response{code = Code, body = Body}) ->
