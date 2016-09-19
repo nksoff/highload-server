@@ -9,7 +9,8 @@
 
 -record(response, {
           code = 400 :: http_code(),
-          body = "" :: binary(),
+          body = <<"">> :: binary(),
+          body_from_file = <<"">> :: binary(),
           content_type = "text/html" :: binary()
          }).
 

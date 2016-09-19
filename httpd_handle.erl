@@ -22,13 +22,17 @@ get_request(RawHttpString) ->
     [Method, RawPath | _] = binary:split(RawHttpString, ?DELIMITERS, [trim_all, global]),
     #request{method = Method, path = http_uri:decode(binary_to_list(RawPath))}.
 
+handle_path(Path) ->
+    [{_, DocumentRoot} | _] = ets:lookup(highload_settings, "document_root"),
+    filename:join(DocumentRoot, Path).
+
 is_path_valid(Path) ->
     not lists:member("..", string:tokens(Path, "/")).
 
 get_response(#request{method = Method, path = Path}) ->
-    io:write(Method),
     MethodValid = Method =:= <<"GET">> orelse Method =:= <<"HEAD">>,
-    PathValid = is_path_valid(Path),
+    HandledPath = handle_path(Path),
+    PathValid = is_path_valid(HandledPath),
 
     case {MethodValid, PathValid} of
         {false, _} ->
