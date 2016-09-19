@@ -28,7 +28,7 @@ listen() ->
                                        {reuseaddr, DefaultReuseaddr}
                                      ]) of
         {ok, LSocket} -> 
-            http_accept:accept(LSocket),
+            httpd_accept:accept(LSocket),
             {ok, DefaultPort};
         {error, Reason} ->
             {error, Reason}

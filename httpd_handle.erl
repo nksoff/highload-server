@@ -1,11 +1,15 @@
 -module(httpd_handle).
+-include("httpd.hrl").
 
 -export([action/1]).
 
 action(Socket) ->
     case gen_tcp:recv(Socket, 0) of
-        {ok, _Data} ->
-            gen_tcp:send(Socket, response("Hello")),
+        {ok, Data} ->
+            Request = get_request(Data),
+            Response = get_response(Request),
+
+            gen_tcp:send(Socket, response_to_text(Response)),
             gen_tcp:close(Socket),
             ok;
         _ ->
@@ -14,9 +18,27 @@ action(Socket) ->
 
     end.
 
-response(Str) ->
-    B = iolist_to_binary(Str),
-    iolist_to_binary(
-      io_lib:fwrite(
-        "HTTP/1.0 200 OK\nContent-Type: text/html\nContent-Length: ~p\n\n~s",
-        [size(B), B])).
+get_request(RawHttpString) ->
+    [Method, RawPath | _] = binary:split(RawHttpString, ?DELIMITERS, [trim_all, global]),
+    #request{method = Method, path = http_uri:decode(binary_to_list(RawPath))}.
+
+is_path_valid(Path) ->
+    not lists:member("..", string:tokens(Path, "/")).
+
+get_response(#request{method = Method, path = Path}) ->
+    io:write(Method),
+    MethodValid = Method =:= <<"GET">> orelse Method =:= <<"HEAD">>,
+    PathValid = is_path_valid(Path),
+
+    case {MethodValid, PathValid} of
+        {false, _} ->
+            #response{code = 400, body = "Wrong method"};
+        {_, false} ->
+            #response{code = 400, body = "Wrong path"};
+        _ ->
+            #response{code = 200, body = Path}
+    end.
+
+response_to_text(#response{code = Code, body = Body}) ->
+    NewBody = iolist_to_binary(Body),
+    "HTTP/1.1 " ++ integer_to_list(Code) ++ " OK\r\nContent-Length: " ++ integer_to_list(size(NewBody)) ++ "\r\nConnection: close\r\n\r\n" ++ NewBody.
