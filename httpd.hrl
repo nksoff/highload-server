@@ -8,10 +8,8 @@
          }).
 
 -record(response, {
-          code = 400 :: http_code(),
-          body = <<"">> :: binary(),
+          code = 405 :: http_code(),
           body_from_file = <<"">> :: binary(),
-          content_type = "text/html" :: binary(),
           headers_only = false :: boolean()
          }).
 

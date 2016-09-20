@@ -9,8 +9,7 @@ action(Socket) ->
         {ok, Data} ->
             Request = get_request(Data),
             Response = get_response(Request),
-
-            gen_tcp:send(Socket, response_to_text(Response)),
+            make_response(Response, Socket),
             gen_tcp:close(Socket),
             ok;
         _ ->
@@ -52,9 +51,9 @@ get_response(#request{method = Method, path = Path}) ->
 
     case {MethodValid, PathValid} of
         {false, _} ->
-            #response{code = 400, body = "Wrong method"};
+            #response{code = 405};
         {_, false} ->
-            #response{code = 400, body = "Wrong path"};
+            #response{code = 405};
         _ ->
             FileAvailable = is_file_available(HandledPath),
 
@@ -68,6 +67,74 @@ get_response(#request{method = Method, path = Path}) ->
             end
     end.
 
-response_to_text(#response{code = Code, body = Body}) ->
-    NewBody = iolist_to_binary(Body),
-    "HTTP/1.1 " ++ integer_to_list(Code) ++ " OK\r\nContent-Length: " ++ integer_to_list(size(NewBody)) ++ "\r\nConnection: close\r\n\r\n" ++ NewBody.
+code_to_header(Code) ->
+    CodeStr = "HTTP/1.1 " ++ integer_to_list(Code) ++ " ",
+    case Code of
+        200 ->
+            CodeStr ++ "OK";
+        404 ->
+            CodeStr ++ "Not found";
+        405 ->
+            CodeStr ++ "Method not allowed"
+    end.
+
+date_for_header() -> 
+    {Date, {Hours, Minutes, Seconds}} = calendar:universal_time(),
+	DayOfWeek = element(calendar:day_of_the_week(Date), {"Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"}),
+	{Year, MonthNumber, Day} = Date,
+	Month = element(MonthNumber, {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"}),
+	io_lib:format("~s, ~B ~s ~B ~2..0B:~2..0B:~2..0B GMT", [DayOfWeek, Day, Month, Year, Hours, Minutes, Seconds]).
+
+common_headers() ->
+    "Server: httpd" ++
+    "\r\n" ++
+    "Date: " ++
+    date_for_header() ++
+    "\r\n" ++
+    "Connection: close" ++
+    "\r\n".
+
+mime_type(File) ->
+    case filename:extension(File) of
+        <<".html">> -> "text/html";
+        <<".css">>  -> "text/css";
+        <<".js">>   -> "application/x-javascript";
+        <<".jpg">>  -> "image/jpeg";
+        <<".jpeg">> -> "image/jpeg";
+        <<".png">>  -> "image/png";
+        <<".gif">>  -> "image/gif";
+        <<".swf">>  -> "application/x-shockwave-flash";
+        _ ->
+            undefined
+    end.
+
+file_headers(File) ->
+    MimeType = mime_type(list_to_binary(File)),
+    {ok, FileInfo} = file:read_file_info(File),
+    Size = FileInfo#file_info.size,
+
+    ContentLength = "Content-Length: " ++ integer_to_list(Size) ++ "\r\n",
+
+    case MimeType of
+        undefined ->
+            ContentLength;
+        _ ->
+            "Content-Type: " ++ MimeType ++ "\r\n" ++ ContentLength
+    end.
+
+make_response(#response{code = Code, body_from_file = BodyFromFile, headers_only = HeadersOnly}, Socket) ->
+    StartHeaders = code_to_header(Code) ++
+    "\r\n" ++
+    common_headers(),
+
+    case BodyFromFile of
+        <<"">> -> % not a file response
+            gen_tcp:send(Socket, StartHeaders),
+            gen_tcp:send(Socket, "\r\n");
+        _ ->
+            gen_tcp:send(Socket, StartHeaders ++ file_headers(BodyFromFile) ++ "\r\n"),
+            case HeadersOnly of
+                false ->
+                    file:sendfile(list_to_binary(BodyFromFile), Socket)
+            end
+    end.
