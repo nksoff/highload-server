@@ -1,6 +1,6 @@
 compile:
 	@ mkdir -p ebin
-	@ erlc -o ebin httpd*.erl
+	@ erlc -o ebin src/httpd*.erl
 
 clean:
 	@ rm -rf ebin
