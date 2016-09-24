@@ -4,7 +4,7 @@
 
 start() ->
     ets:new(highload_settings, [named_table, protected, set, {keypos, 1}]),
-    ets:insert(highload_settings, {"document_root", "http-test-suite/httptest"}),
+    ets:insert(highload_settings, {"document_root", "http-test-suite"}),
 
     [{_, DocumentRoot} | _] = ets:lookup(highload_settings, "document_root"),
     case filelib:ensure_dir(DocumentRoot) of

@@ -19,17 +19,21 @@ action(Socket) ->
     end.
 
 get_request(RawHttpString) ->
-    [Method, RawPath | _] = binary:split(RawHttpString, ?DELIMITERS, [trim_all, global]),
-    #request{method = Method, path = http_uri:decode(binary_to_list(RawPath))}.
+    case binary:split(RawHttpString, ?DELIMITERS, [trim_all, global]) of
+        [Method, RawPath | _] ->
+            #request{method = Method, path = http_uri:decode(binary_to_list(RawPath))};
+        _ ->
+            #request{method = <<"FAIL">>, path = "/../"}
+    end.
 
 handle_path(Path) ->
     [{_, DocumentRoot} | _] = ets:lookup(highload_settings, "document_root"),
     FlattenedPath = filename:flatten([DocumentRoot, Path]),
     case binary:last(list_to_binary(FlattenedPath)) of
         $/ ->
-            filename:flatten([FlattenedPath, ?DEFAULT_INDEX]);
+            {directory, filename:flatten([FlattenedPath, ?DEFAULT_INDEX])};
         _ ->
-            FlattenedPath
+            {file, FlattenedPath}
     end.
 
 is_path_valid(Path) ->
@@ -46,24 +50,29 @@ is_file_available(Path) ->
 
 get_response(#request{method = Method, path = Path}) ->
     MethodValid = Method =:= <<"GET">> orelse Method =:= <<"HEAD">>,
-    HandledPath = handle_path(Path),
+    {PathType, HandledPath} = handle_path(Path),
     PathValid = is_path_valid(HandledPath),
 
     case {MethodValid, PathValid} of
         {false, _} ->
             #response{code = 405};
         {_, false} ->
-            #response{code = 405};
+            #response{code = 400};
         _ ->
             FileAvailable = is_file_available(HandledPath),
 
             case {FileAvailable, Method} of
                 {true, <<"GET">>} ->
-                    #response{code = 200, body_from_file = HandledPath};
-                {true, <<"HEAD">>} ->
                     #response{code = 200, body_from_file = HandledPath, headers_only = false};
+                {true, <<"HEAD">>} ->
+                    #response{code = 200, body_from_file = HandledPath, headers_only = true};
                 _ ->
-                    #response{code = 404}
+                    case PathType of
+                        directory ->
+                            #response{code = 403};
+                        file ->
+                            #response{code = 404}
+                    end
             end
     end.
 
@@ -72,13 +81,17 @@ code_to_header(Code) ->
     case Code of
         200 ->
             CodeStr ++ "OK";
+        400 ->
+            CodeStr ++ "Bad request";
+        403 ->
+            CodeStr ++ "Forbidden";
         404 ->
             CodeStr ++ "Not found";
         405 ->
             CodeStr ++ "Method not allowed"
     end.
 
-date_for_header() -> 
+date_for_header() ->
     {Date, {Hours, Minutes, Seconds}} = calendar:universal_time(),
 	DayOfWeek = element(calendar:day_of_the_week(Date), {"Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"}),
 	{Year, MonthNumber, Day} = Date,
@@ -135,6 +148,8 @@ make_response(#response{code = Code, body_from_file = BodyFromFile, headers_only
             gen_tcp:send(Socket, StartHeaders ++ file_headers(BodyFromFile) ++ "\r\n"),
             case HeadersOnly of
                 false ->
-                    file:sendfile(list_to_binary(BodyFromFile), Socket)
+                    file:sendfile(list_to_binary(BodyFromFile), Socket);
+                _ ->
+                    ok
             end
     end.
