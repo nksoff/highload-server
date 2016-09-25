@@ -6,4 +6,4 @@ clean:
 	@ rm -rf ebin
 
 run: compile
-	@ erl -pa ebin
+	@ erl -pa ebin -noshell -s httpd start -s init stop

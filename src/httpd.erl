@@ -3,16 +3,37 @@
 -export([start/0]).
 
 start() ->
-    ets:new(highload_settings, [named_table, protected, set, {keypos, 1}]),
-    ets:insert(highload_settings, {"document_root", "http-test-suite"}),
+    case os:getenv("HTTPD_DOCUMENT_PATH") of
+        false ->
+            DocRoot = "./",
+            ok;
+        X ->
+            DocRoot = X
+    end,
 
-    [{_, DocumentRoot} | _] = ets:lookup(highload_settings, "document_root"),
-    case filelib:ensure_dir(DocumentRoot) of
-        ok ->
-            listen();
+    ets:new(highload_settings, [named_table, protected, set, {keypos, 1}]),
+    ets:insert(highload_settings, {"document_root", DocRoot}),
+
+    io:format("working directory is ~s~n", [DocRoot]),
+
+    case filelib:is_dir(DocRoot) of
+        true ->
+            ok;
         _ ->
-            {error, directory_not_found}
-    end.
+            io:format("warning: directory ~s is not found~n", [DocRoot])
+    end,
+
+    NCpu = os:getenv("HTTPD_CPU"),
+
+    case NCpu of
+        false ->
+            ok;
+        _ ->
+            io:format("cpus: ~s~n", [NCpu]),
+            erlang:system_flag(schedulers_online, list_to_integer(NCpu))
+    end,
+
+    listen().
 
 listen() ->
     DefaultPort = 80,
