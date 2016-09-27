@@ -5,8 +5,9 @@
 start() ->
     case os:getenv("HTTPD_DOCUMENT_PATH") of
         false ->
-            DocRoot = "./",
-            ok;
+            DocRoot = "./";
+        "" ->
+            DocRoot = "./";
         X ->
             DocRoot = X
     end,
