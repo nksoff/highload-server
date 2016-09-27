@@ -27,7 +27,7 @@ get_request(RawHttpString) ->
     end.
 
 handle_path(Path) ->
-    [{_, DocumentRoot} | _] = ets:lookup(highload_settings, "document_root"),
+    DocumentRoot = httpd:get_setting("path"),
     FlattenedPath = filename:flatten([DocumentRoot, Path]),
     case binary:last(list_to_binary(FlattenedPath)) of
         $/ ->
