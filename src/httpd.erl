@@ -1,9 +1,12 @@
 -module(httpd).
+
+-behaviour(supervisor).
+
 -include("httpd.hrl").
 
--export([start/0, get_setting/1]).
+-export([init/1, start_link/0, get_setting/1]).
 
-start() ->
+init(_Arg) ->
     DocRoot = get_setting("path"),
     io:format("working directory is ~s~n", [DocRoot]),
 
@@ -18,7 +21,38 @@ start() ->
     io:format("cpus: ~B~n", [Cpu]),
     erlang:system_flag(schedulers_online, Cpu),
 
-    listen().
+    case listen() of
+        {ok, _Port, LSocket} ->
+            {
+             ok,
+             {
+              {
+               one_for_all,          %% Restart strategy
+               5,                    %% Max Restarts
+               60                    %% Max Time
+              },
+              [
+               {
+                httpd_accept_pool_id, %% ID
+                {
+                 httpd_accept_pool,   %% Module Name
+                 start_link,         %% Function Name
+                 [ LSocket ]         %% Args
+                },
+                permanent,           %% Restart Type
+                10000,               %% Max shutdown wait time (10 sec)
+                supervisor,          %% Child Type
+                [httpd_accept_pool]  %% Callback Module
+               }
+              ]
+             }
+            };
+        {error, Reason} ->
+            {error, Reason}
+    end.
+
+start_link() ->
+    supervisor:start_link({local, ?MODULE}, ?MODULE, []).
 
 listen() ->
     DefaultPort = get_setting("port"),
@@ -46,8 +80,7 @@ listen() ->
                                        {reuseaddr, DefaultReuseaddr}
                                      ]) of
         {ok, LSocket} -> 
-            httpd_accept:accept(LSocket),
-            {ok, DefaultPort};
+            {ok, DefaultPort, LSocket};
         {error, Reason} ->
             {error, Reason}
     end.

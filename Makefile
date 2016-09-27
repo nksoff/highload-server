@@ -1,9 +1,9 @@
 compile:
 	@ mkdir -p ebin
-	@ erlc -o ebin src/httpd*.erl
+	@ erlc -o ebin src/*.erl
 
 clean:
-	@ rm -rf ebin
+	@ rm -rf ebin/*.beam
 
-run: compile
-	@ erl -pa ebin -noshell -s httpd start -s init stop
+run: clean compile
+	@ erl -pa ebin -noshell -eval 'application:start(app).'
