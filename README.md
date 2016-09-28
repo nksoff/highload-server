@@ -8,7 +8,7 @@ Moreover, I wanter to try erlang out. So, it's my first erlang application using
 
 ## Ho to execute
 
-You should hanve installed `erl`, `erlc`.
+You should have installed `erl`, `erlc`.
 
 Entry point is `httpd` script which purpose is to pass environment variables to erlang script.
 Arguments: `-r /server/document/root` - document path for server (root for / requests), `-c 2` - schedulers online flag for erlang (smth like processor cores).
