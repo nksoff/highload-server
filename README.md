@@ -4,7 +4,7 @@ The server accepts only `GET`, `HEAD` requests. If requested file exists, in res
 
 This server was written to pass hometask in Highload course in [Technopark@mail.ru](https://park.mail.ru). The reqired tests can be found in [init/http-test-suite](https://github.com/init/http-test-suite).
 
-Moreover, I wanter to try erlang out. So, it's my first erlang application using OTP.
+Moreover, I wanted to try erlang out. So, it's my first erlang application using OTP.
 
 ## Ho to execute
 
